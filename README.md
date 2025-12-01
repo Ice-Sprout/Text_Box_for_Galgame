@@ -1,4 +1,4 @@
-# Text Box for Galgame
+# Text_Box_for_Galgame
 
 一个将文本转换为类似Galgame对话风格图片的程序。
 
