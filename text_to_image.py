@@ -95,6 +95,11 @@ def pre_generate_character_images(character_name, background_name=DEFAULT_BACKGR
 
     # 获取角色专属文字配置
     text_configs = text_configs_dict.get(character_name, [])
+
+    # 获取角色的 enlarge 参数，默认为 1.0
+    enlarge = character_config.get("enlarge", 1.0)
+    # 计算目标宽度：基础750像素乘以enlarge参数
+    target_char_width = int(750 * enlarge)
     
     for i in range(num_bg):
         # 加载背景图片
@@ -160,9 +165,10 @@ def pre_generate_character_images(character_name, background_name=DEFAULT_BACKGR
             overlay_path = os.path.join(character_folder, f"{character_name}{j+1}.png")
             overlay = Image.open(overlay_path).convert("RGBA")
             
-            # ====== 新增：缩放角色表情图片到宽度750像素 ======
-            target_char_width = 750  # 目标宽度750像素
+            # ====== 修改：根据 enlarge 参数缩放角色表情图片 ======
             overlay_width, overlay_height = overlay.size
+            
+            # 如果当前宽度不是目标宽度，则进行缩放
             if overlay_width != target_char_width:
                 # 计算缩放比例
                 scale_factor = target_char_width / overlay_width

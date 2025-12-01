@@ -3,7 +3,7 @@
   "current_character": "xingling",
   "current_background": "ustc",
   "expression": null,
-  "latex_enabled": true,
+  "latex_enabled": false,
   "delay": 0.1,
   "reduce_image": true,
   "auto_paste": true,

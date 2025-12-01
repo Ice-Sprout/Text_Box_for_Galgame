@@ -124,8 +124,13 @@ class ResourceManager:
         self.new_char_drawy = tk.StringVar(value="0")
         ttk.Entry(create_frame, textvariable=self.new_char_drawy, width=10).grid(row=2, column=3, sticky=tk.W, pady=5, padx=5)
         
-        # 创建按钮
-        ttk.Button(create_frame, text="创建角色文件夹", command=self.create_character_folder).grid(row=3, column=0, columnspan=4, pady=10)
+        # enlarge 设置
+        ttk.Label(create_frame, text="enlarge:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        self.new_char_enlarge = tk.StringVar(value="1.0")
+        ttk.Entry(create_frame, textvariable=self.new_char_enlarge, width=10).grid(row=3, column=1, sticky=tk.W, pady=5, padx=5)
+        
+        # 创建按钮 - 注意行号修正
+        ttk.Button(create_frame, text="创建角色文件夹", command=self.create_character_folder).grid(row=4, column=0, columnspan=4, pady=10)
         
         # 角色列表
         ttk.Label(parent, text="现有角色:").grid(row=1, column=0, sticky=tk.W, pady=5)
@@ -142,23 +147,28 @@ class ResourceManager:
         ttk.Button(char_button_frame, text="删除角色", command=self.delete_character).grid(row=0, column=3, padx=5)
         ttk.Button(char_button_frame, text="刷新列表", command=self.refresh_character_list).grid(row=0, column=4, padx=5)
         
-        # 角色设置显示
-        settings_frame = ttk.LabelFrame(parent, text="角色设置", padding="10")
-        settings_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        # 角色设置显示 - 改为实例变量
+        self.settings_frame = ttk.LabelFrame(parent, text="角色设置", padding="10")
+        self.settings_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
         
         # 角色颜色显示
-        ttk.Label(settings_frame, text="角色颜色:").grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.char_color_label = ttk.Label(settings_frame, text="未设置", background="white", width=15)
+        ttk.Label(self.settings_frame, text="角色颜色:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.char_color_label = ttk.Label(self.settings_frame, text="未设置", background="white", width=15)
         self.char_color_label.grid(row=0, column=1, sticky=tk.W, pady=5, padx=5)
         
         # drawx 和 drawy 显示
-        ttk.Label(settings_frame, text="drawx:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.char_drawx_label = ttk.Label(settings_frame, text="0")
+        ttk.Label(self.settings_frame, text="drawx:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.char_drawx_label = ttk.Label(self.settings_frame, text="0")
         self.char_drawx_label.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
         
-        ttk.Label(settings_frame, text="drawy:").grid(row=1, column=2, sticky=tk.W, pady=5)
-        self.char_drawy_label = ttk.Label(settings_frame, text="0")
+        ttk.Label(self.settings_frame, text="drawy:").grid(row=1, column=2, sticky=tk.W, pady=5)
+        self.char_drawy_label = ttk.Label(self.settings_frame, text="0")
         self.char_drawy_label.grid(row=1, column=3, sticky=tk.W, pady=5, padx=5)
+
+        # enlarge 显示（新增）
+        ttk.Label(self.settings_frame, text="enlarge:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.char_enlarge_label = ttk.Label(self.settings_frame, text="1.0")
+        self.char_enlarge_label.grid(row=2, column=1, sticky=tk.W, pady=5, padx=5)
         
         # 角色图片预览
         ttk.Label(parent, text="角色表情预览:").grid(row=5, column=0, sticky=tk.W, pady=5)
@@ -262,6 +272,10 @@ class ResourceManager:
             drawx = int(self.new_char_drawx.get())
             drawy = int(self.new_char_drawy.get())
             
+            # 获取 enlarge 参数
+            enlarge_value = self.new_char_enlarge.get().strip()
+            enlarge = float(enlarge_value) if enlarge_value else 1.0
+            
             os.makedirs(char_path)
             
             # 创建角色配置文件
@@ -271,6 +285,7 @@ class ResourceManager:
                 "display_name": display_name,
                 "drawx": drawx,
                 "drawy": drawy,
+                "enlarge": enlarge,  # 新增 enlarge 参数
                 "font": "font3.ttf",
                 "color": {"r": 255, "g": 255, "b": 255}  # 默认白色
             }
@@ -283,13 +298,14 @@ class ResourceManager:
             # 清空输入框
             self.new_char_folder_name.set("")
             self.new_char_display_name.set("")
-            self.new_char_drawx.set("-450")
-            self.new_char_drawy.set("-100")
+            self.new_char_drawx.set("0")
+            self.new_char_drawy.set("0")
+            self.new_char_enlarge.set("1.0")  # 重置 enlarge 输入框
             
             self.refresh_character_list()
             
-        except ValueError:
-            messagebox.showerror("错误", "drawx 和 drawy 必须是整数")
+        except ValueError as e:
+            messagebox.showerror("错误", f"输入值错误: {e}")
         except Exception as e:
             messagebox.showerror("错误", f"创建角色文件夹失败: {e}")
     
@@ -527,6 +543,11 @@ class ResourceManager:
         ttk.Label(edit_dialog, text="drawy:").grid(row=2, column=0, sticky=tk.W, pady=10, padx=10)
         drawy_var = tk.StringVar(value=str(config_data.get("drawy", -100)))
         ttk.Entry(edit_dialog, textvariable=drawy_var, width=10).grid(row=2, column=1, sticky=tk.W, pady=10, padx=10)
+            
+        # enlarge 设置
+        ttk.Label(edit_dialog, text="enlarge:").grid(row=3, column=0, sticky=tk.W, pady=10, padx=10)
+        enlarge_var = tk.StringVar(value=str(config_data.get("enlarge", 1.0)))
+        ttk.Entry(edit_dialog, textvariable=enlarge_var, width=10).grid(row=3, column=1, sticky=tk.W, pady=10, padx=10)
         
         def save_settings():
             try:
@@ -534,6 +555,7 @@ class ResourceManager:
                 config_data["display_name"] = display_name_var.get()
                 config_data["drawx"] = int(drawx_var.get())
                 config_data["drawy"] = int(drawy_var.get())
+                config_data["enlarge"] = float(enlarge_var.get())  # 新增 enlarge
                 
                 # 保存配置
                 with open(config_path, 'w', encoding='utf-8') as f:
@@ -549,11 +571,11 @@ class ResourceManager:
                 # 刷新角色信息显示
                 self.on_character_select(None)
                 
-            except ValueError:
-                messagebox.showerror("错误", "drawx 和 drawy 必须是整数")
+            except ValueError as e:
+                messagebox.showerror("错误", f"输入值错误: {e}")
         
-        # 保存按钮
-        ttk.Button(edit_dialog, text="保存设置", command=save_settings).grid(row=3, column=0, columnspan=2, pady=20)
+        # 保存按钮位置调整
+        ttk.Button(edit_dialog, text="保存设置", command=save_settings).grid(row=4, column=0, columnspan=2, pady=20)
     
     def delete_background(self):
         """删除背景"""
@@ -627,11 +649,13 @@ class ResourceManager:
                 display_name = config_data.get("display_name", char_folder_name)
                 drawx = config_data.get("drawx", 0)
                 drawy = config_data.get("drawy", 0)
+                enlarge = config_data.get("enlarge", 1.0)  # 获取 enlarge
                 color = config_data.get("color", {"r": 255, "g": 255, "b": 255})
                 
                 # 更新显示
                 self.char_drawx_label.config(text=str(drawx))
                 self.char_drawy_label.config(text=str(drawy))
+                self.char_enlarge_label.config(text=str(enlarge))  # 更新 enlarge 显示
                 
                 # 颜色显示
                 r, g, b = color["r"], color["g"], color["b"]
@@ -645,6 +669,7 @@ class ResourceManager:
                 self.char_color_label.config(background="white", text="未设置")
                 self.char_drawx_label.config(text="0")
                 self.char_drawy_label.config(text="0")
+                self.char_enlarge_label.config(text="1.0")  # 默认 enlarge 显示
     
     def generate_config_preview(self):
         """生成配置预览"""
@@ -717,6 +742,7 @@ class ResourceManager:
                         display_name = config_data.get("display_name", char_folder_name)
                         drawx = config_data.get("drawx", -450)
                         drawy = config_data.get("drawy", -100)
+                        enlarge = config_data.get("enlarge", 1.0)  # 新增 enlarge
                         color = config_data.get("color", {"r": 255, "g": 255, "b": 255})
                         font = config_data.get("font", "font3.ttf")
                     else:
@@ -724,16 +750,18 @@ class ResourceManager:
                         display_name = char_folder_name
                         drawx = -450
                         drawy = -100
+                        enlarge = 1.0  # 默认 enlarge 为 1.0
                         color = {"r": 255, "g": 255, "b": 255}
                         font = "font3.ttf"
                     
-                    # 角色配置 - 添加display_name字段
+                    # 角色配置 - 添加display_name字段和enlarge字段
                     characters[char_folder_name] = {
                         "display_name": display_name,  # 添加显示名
                         "emotion_count": emotion_count,
                         "font": font,
                         "drawy": drawy,
-                        "drawx": drawx
+                        "drawx": drawx,
+                        "enlarge": enlarge  # 新增 enlarge 参数
                     }
                     
                     # 生成文字配置

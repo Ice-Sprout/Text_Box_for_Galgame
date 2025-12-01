@@ -27,7 +27,8 @@ characters = {
         "emotion_count": 15,
         "font": "font3.ttf",
         "drawy": 0,
-        "drawx": 0
+        "drawx": 0,
+        "enlarge": 1.0
     }
 }
 
