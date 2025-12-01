@@ -1,0 +1,10 @@
+pip install pywin32
+pip install pillow
+pip install keyboard
+pip install pyperclip
+pip install psutil
+pip install emoji==1.7.0
+pip install pilmoji
+pip install requests
+pip install unicodeit
+pip install logging

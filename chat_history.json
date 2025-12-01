@@ -1,0 +1,62 @@
+[
+  {
+    "text": "有些提示也没做到位，现在应该还是main好用一点",
+    "emotion_id": 4,
+    "emotion_name": "气恼",
+    "timestamp": 1764595691.52141
+  },
+  {
+    "text": "requirement我改了一下",
+    "emotion_id": 10,
+    "emotion_name": "认真",
+    "timestamp": 1764595691.52141
+  },
+  {
+    "text": "emoge应该需要特定版本的",
+    "emotion_id": 4,
+    "emotion_name": "气恼",
+    "timestamp": 1764595691.52141
+  },
+  {
+    "text": "然后latex其实是本地的.py文件不用下",
+    "emotion_id": 10,
+    "emotion_name": "认真",
+    "timestamp": 1764595691.52141
+  },
+  {
+    "text": "测试一下切换",
+    "emotion_id": 10,
+    "emotion_name": "认真",
+    "timestamp": 1764595691.52141
+  },
+  {
+    "text": "测试一下切换",
+    "emotion_id": 12,
+    "emotion_name": "疑惑",
+    "timestamp": 1764595691.52141
+  },
+  {
+    "text": "就是有点丑（）",
+    "emotion_id": 4,
+    "emotion_name": "气恼",
+    "timestamp": 1764595691.52141
+  },
+  {
+    "text": "（（",
+    "emotion_id": 4,
+    "emotion_name": "气恼",
+    "timestamp": 1764595691.52141
+  },
+  {
+    "text": "行",
+    "emotion_id": 4,
+    "emotion_name": "气恼",
+    "timestamp": 1764595691.52141
+  },
+  {
+    "text": "测试一下",
+    "emotion_id": 10,
+    "emotion_name": "认真",
+    "timestamp": 1764595691.52141
+  }
+]

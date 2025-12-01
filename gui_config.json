@@ -1,0 +1,25 @@
+{
+  "global_hotkey": "alt+shift+a",
+  "current_character": "karuha",
+  "current_background": "hoshishiro",
+  "expression": null,
+  "latex_enabled": false,
+  "delay": 0.1,
+  "reduce_image": true,
+  "auto_paste": true,
+  "auto_send": true,
+  "block_hotkey": true,
+  "select_all_hotkey": "ctrl+a",
+  "cut_hotkey": "ctrl+x",
+  "paste_hotkey": "ctrl+v",
+  "send_hotkey": "enter",
+  "hotkey": "enter",
+  "window_whitelist": [
+    "TIM.exe",
+    "WeChat.exe",
+    "Weixin.exe",
+    "WeChatApp.exe",
+    "QQ.exe"
+  ],
+  "enable_whitelist": true
+}
