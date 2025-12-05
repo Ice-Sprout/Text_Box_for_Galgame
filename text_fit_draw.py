@@ -11,12 +11,29 @@ VAlign = Literal["top", "middle", "bottom"]
 # ===== PyInstaller 资源路径处理函数 =====
 
 def get_resource_path(relative_path):
-    """获取资源文件的绝对路径，兼容开发环境和打包后的环境"""
+    """获取资源文件的绝对路径，优先使用同级 `resource/` 目录（参见项目发布约定）。"""
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else None
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    candidates = []
+    if exe_dir:
+        candidates.append(os.path.join(exe_dir, 'resource'))
+    candidates.append(os.path.join(script_dir, 'resource'))
+
+    for base in candidates:
+        candidate = os.path.join(base, relative_path)
+        if os.path.exists(candidate):
+            return candidate
+
     try:
         base_path = sys._MEIPASS
+        candidate = os.path.join(base_path, relative_path)
+        if os.path.exists(candidate):
+            return candidate
     except AttributeError:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_path, relative_path)
+        pass
+
+    return os.path.join(script_dir, relative_path)
 
 try:
     from pilmoji import Pilmoji

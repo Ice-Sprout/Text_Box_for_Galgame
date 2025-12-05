@@ -4,6 +4,15 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import sys
 import win32clipboard
+import os
+
+# Ensure that an external `resource/` folder (placed next to the exe/script) is preferred
+# so that `info.py` and other editable resources can live outside the packaged executable.
+exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else None
+resource_dir = os.path.join(exe_dir, 'resource') if exe_dir else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource')
+if os.path.isdir(resource_dir) and resource_dir not in sys.path:
+    sys.path.insert(0, resource_dir)
+
 from info import background_configs, characters, text_configs_dict, DEFAULT_BACKGROUND
 from api import get_emotion_from_text, get_emotion_name, DEFAULT_EMOTION
 from text_fit_draw import draw_text_auto
@@ -11,12 +20,40 @@ from image_fit_paste import paste_image_auto
 from reduce import compress_image_simple
 
 def get_resource_path(relative_path):
-    """获取资源文件的绝对路径，兼容开发环境和打包后的环境"""
+    """获取资源文件的绝对路径。
+
+    解析优先级（目标：不使用临时提取目录，优先使用随 exe 一起分发的 `resource/` 文件夹）：
+    1. 如果可执行文件或脚本目录同级存在 `resource/` 目录，则使用该目录（推荐发布方式：将 `resource/` 与 `gui.exe` 放在同一目录）。
+    2. 否则，尝试使用当前脚本所在目录的 `resource/` 目录（开发环境）。
+    3. 若上述都不存在且 PyInstaller 提取目录 `sys._MEIPASS` 可用，则回退到该临时目录（仅作为最后选项）。
+    4. 最后回退到脚本目录。
+    """
+    # 运行时可执行文件目录（如果被打包为 exe，sys.executable 指向 exe）
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else None
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # 首选：与 exe/script 同级的 resource 文件夹
+    candidates = []
+    if exe_dir:
+        candidates.append(os.path.join(exe_dir, 'resource'))
+    candidates.append(os.path.join(script_dir, 'resource'))
+
+    for base in candidates:
+        candidate = os.path.join(base, relative_path)
+        if os.path.exists(candidate):
+            return candidate
+
+    # 回退：如果存在 sys._MEIPASS（PyInstaller onefile 提取目录），使用之
     try:
         base_path = sys._MEIPASS
+        candidate = os.path.join(base_path, relative_path)
+        if os.path.exists(candidate):
+            return candidate
     except AttributeError:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_path, relative_path)
+        pass
+
+    # 最后回退到脚本目录下的路径（即：项目源码布局）
+    return os.path.join(script_dir, relative_path)
 
 
 def get_clipboard_image():
@@ -55,11 +92,31 @@ def get_clipboard_image():
     return image
 
 def get_pregen_folder():
-    """获取预生成图片文件夹路径"""
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    pregen_folder = os.path.join(base_dir, 'galframeforchat')
-    os.makedirs(pregen_folder, exist_ok=True)
-    return pregen_folder
+    """获取预生成图片文件夹路径。
+
+    优先在 `resource/galframeforchat` 中查找/创建；若不存在则在当前脚本目录下创建。
+    这样打包发布时可以把预生成图片放到 release 的 `resource/galframeforchat` 中，避免写入系统临时目录或 C:\。
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # 优先使用 resource 子目录（与 exe 同级的 resource/）
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else None
+    candidates = []
+    if exe_dir:
+        candidates.append(os.path.join(exe_dir, 'resource', 'galframeforchat'))
+    candidates.append(os.path.join(script_dir, 'resource', 'galframeforchat'))
+    candidates.append(os.path.join(script_dir, 'galframeforchat'))
+
+    for folder in candidates:
+        try:
+            os.makedirs(folder, exist_ok=True)
+            return folder
+        except Exception:
+            continue
+
+    # 最后回退：当前脚本目录下的 galframeforchat
+    fallback = os.path.join(script_dir, 'galframeforchat')
+    os.makedirs(fallback, exist_ok=True)
+    return fallback
 
 def check_pregen_images_exist(character_name, background_name=DEFAULT_BACKGROUND):
     """检查预生成图片是否已存在且完整"""

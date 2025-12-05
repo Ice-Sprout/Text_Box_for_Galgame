@@ -3,6 +3,24 @@ import json
 import os
 import time
 from typing import Literal, Optional, List
+import sys
+
+
+# ===== Resource helper: prefer `resource/` next to exe/script =====
+def _resource_path(relative_path: str) -> str:
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else None
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = []
+    if exe_dir:
+        candidates.append(os.path.join(exe_dir, 'resource'))
+    candidates.append(os.path.join(script_dir, 'resource'))
+    for base in candidates:
+        candidate = os.path.join(base, relative_path)
+        # if file exists or base exists, return resolved path (caller will check existence when needed)
+        if os.path.exists(candidate) or os.path.exists(base):
+            return candidate
+    # fallback to script dir
+    return os.path.join(script_dir, relative_path)
 
 # 情绪配置常量
 EMOTION_COUNT = 15  # 情绪总数
@@ -27,16 +45,19 @@ EMOTION_MAPPING = {
 
 # 历史对话配置
 MAX_HISTORY_COUNT = 10  # 最大保存历史对话条数（避免Prompt过长）
-HISTORY_FILE = "chat_history.json"  # 历史对话持久化文件
+# 历史对话持久化文件 - 优先放到 resource/ 下，便于随 release 一起分发并保持可编辑。
+HISTORY_FILE = _resource_path("chat_history.json")
 
 # ========== 读取API Key ==========
 API_KEY = ""  # 初始化API Key
 
+# 优先从 resource/api.txt 读取，其次从脚本目录下的 api.txt
+api_txt_path = _resource_path("api.txt")
 try:
-    with open("api.txt", "r", encoding="utf-8") as f:
+    with open(api_txt_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
         if len(lines) < 4:
-            print("错误：api.txt文件行数不足，至少需要4行配置")
+            print(f"错误：{api_txt_path} 文件行数不足，至少需要4行配置")
         else:
             enable_flag = lines[1].strip("\n").strip().lower()
             if enable_flag == "true":
@@ -48,9 +69,9 @@ try:
             else:
                 print("API key loading is skipped，配置为不加载API Key")
 except FileNotFoundError:
-    print("错误：未找到api.txt文件，请创建该文件后再配置API Key")
+    print(f"警告：未找到{api_txt_path}，若需启用API请把 api.txt 放到 resource/ 或脚本目录下")
 except PermissionError:
-    print("错误：没有读取api.txt文件的权限，请检查文件权限设置")
+    print(f"错误：没有读取{api_txt_path}文件的权限，请检查文件权限设置")
 except Exception as e:
     print(f"读取API Key时发生未知错误：{str(e)}")
 
@@ -63,10 +84,28 @@ class EmotionAnalyzer:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
         }
+        
+        # 创建会话池，复用TCP连接以减少延迟
+        self.session = requests.Session()
+        
+        # 配置连接池参数
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=10,      # 连接池数量
+            pool_maxsize=20,          # 最大连接数
+            max_retries=3,            # 重试次数
+            pool_block=False          # 非阻塞模式
+        )
+        self.session.mount('https://', adapter)
+        
         # 新增：历史对话存储（格式：[("用户文本1", 情绪编号1), ("用户文本2", 情绪编号2), ...]）
         self.chat_history: List[tuple[str, int]] = []
         # 初始化时加载持久化的历史对话
         self.load_history_from_file()
+
+    def __del__(self):
+        """析构函数，关闭会话池"""
+        if hasattr(self, 'session'):
+            self.session.close()
 
     def analyze_emotion(self, text: str) -> int:
         """
@@ -124,7 +163,7 @@ class EmotionAnalyzer:
         return prompt
 
     def _call_deepseek_api(self, prompt: str) -> str:
-        """调用DeepSeek API"""
+        """调用DeepSeek API，使用会话池优化"""
         payload = {
             "model": "deepseek-chat",
             "messages": [
@@ -135,19 +174,43 @@ class EmotionAnalyzer:
             "top_p": 0.9
         }
 
-        # 设置超时避免长时间等待
-        response = requests.post(
-            self.base_url,
-            headers=self.headers,
-            json=payload,
-            timeout=10
+        try:
+            # 使用会话池进行请求，复用TCP连接
+            response = self.session.post(
+                self.base_url,
+                headers=self.headers,
+                json=payload,
+                timeout=10
+            )
+
+            if response.status_code != 200:
+                raise Exception(f"API请求失败: {response.status_code}，响应：{response.text}")
+
+            result = response.json()
+            return result['choices'][0]['message']['content'].strip()
+            
+        except requests.exceptions.ConnectionError as e:
+            # 连接错误时，重置会话以清除可能的无效连接
+            print(f"连接错误，重置会话池: {e}")
+            self._reset_session()
+            raise
+        except Exception as e:
+            raise Exception(f"API调用失败: {e}")
+
+    def _reset_session(self):
+        """重置会话池，用于处理连接问题"""
+        if hasattr(self, 'session'):
+            self.session.close()
+        
+        # 重新创建会话池
+        self.session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=10,
+            pool_maxsize=20,
+            max_retries=3,
+            pool_block=False
         )
-
-        if response.status_code != 200:
-            raise Exception(f"API请求失败: {response.status_code}，响应：{response.text}")
-
-        result = response.json()
-        return result['choices'][0]['message']['content'].strip()
+        self.session.mount('https://', adapter)
 
     def _parse_emotion_response(self, response_text: str) -> int:
         """解析API返回的情绪编号"""

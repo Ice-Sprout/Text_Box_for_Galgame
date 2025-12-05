@@ -1,0 +1,62 @@
+[
+  {
+    "text": "ceshi",
+    "emotion_id": 10,
+    "emotion_name": "认真",
+    "timestamp": 1764943098.3506892
+  },
+  {
+    "text": "测试一下",
+    "emotion_id": 10,
+    "emotion_name": "认真",
+    "timestamp": 1764943098.3506892
+  },
+  {
+    "text": "测试一下",
+    "emotion_id": 10,
+    "emotion_name": "认真",
+    "timestamp": 1764943098.3506892
+  },
+  {
+    "text": "测试一下",
+    "emotion_id": 10,
+    "emotion_name": "认真",
+    "timestamp": 1764943098.3506892
+  },
+  {
+    "text": "哭哭",
+    "emotion_id": 14,
+    "emotion_name": "哭泣",
+    "timestamp": 1764943098.3506892
+  },
+  {
+    "text": "ceshi",
+    "emotion_id": 10,
+    "emotion_name": "认真",
+    "timestamp": 1764943098.3506892
+  },
+  {
+    "text": "我真的生气了！",
+    "emotion_id": 15,
+    "emotion_name": "愤怒",
+    "timestamp": 1764943098.3506892
+  },
+  {
+    "text": "唉，要是我之前没接这个工作就好了",
+    "emotion_id": 13,
+    "emotion_name": "悲伤",
+    "timestamp": 1764943098.3506892
+  },
+  {
+    "text": "嗨，没办法，还是想点开心的事情吧",
+    "emotion_id": 1,
+    "emotion_name": "平静",
+    "timestamp": 1764943098.3506892
+  },
+  {
+    "text": "昨天的游戏挺好玩的，我还比较喜欢",
+    "emotion_id": 2,
+    "emotion_name": "开心",
+    "timestamp": 1764943098.3506892
+  }
+]

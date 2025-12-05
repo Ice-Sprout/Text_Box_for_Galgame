@@ -53,6 +53,12 @@ import psutil
 from api import get_emotion_from_text, get_emotion_name, EMOTION_COUNT, DEFAULT_EMOTION, clear_chat_history, get_chat_history
 
 from latex import convert_latex_in_text, latex_converter
+# 优先把同级 resource 目录加入模块搜索路径，这样用户可以把 editable 文件（如 info.py）放到 resource/ 中而无需打包进 exe
+exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else None
+resource_dir = os.path.join(exe_dir, 'resource') if exe_dir else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource')
+if os.path.isdir(resource_dir) and resource_dir not in sys.path:
+    sys.path.insert(0, resource_dir)
+
 from info import background_configs, characters, text_configs_dict, DEFAULT_BACKGROUND
 from text_to_image import generate_image, pre_generate_character_images, get_pregen_folder, check_pregen_images_exist, delate
 
@@ -74,15 +80,32 @@ except ImportError:
 
 # ===== PyInstaller 资源路径处理函数 =====
 def get_resource_path(relative_path):
-    """获取资源文件的绝对路径，兼容开发环境和打包后的环境"""
-    try:
-        # PyInstaller 创建临时文件夹，路径存储在 _MEIPASS 中
-        base_path = sys._MEIPASS
-    except AttributeError:
-        # 开发环境中使用当前文件所在目录
-        base_path = os.path.dirname(os.path.abspath(__file__))
+    """获取资源文件的绝对路径（同 text_to_image.py 的实现）。
 
-    return os.path.join(base_path, relative_path)
+    优先查找同级的 `resource/` 目录（与 `gui.exe` 或脚本同目录），以便发布时把资源统一放到 `resource/` 中，避免使用 C:\ 临时目录。
+    """
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else None
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    candidates = []
+    if exe_dir:
+        candidates.append(os.path.join(exe_dir, 'resource'))
+    candidates.append(os.path.join(script_dir, 'resource'))
+
+    for base in candidates:
+        candidate = os.path.join(base, relative_path)
+        if os.path.exists(candidate):
+            return candidate
+
+    try:
+        base_path = sys._MEIPASS
+        candidate = os.path.join(base_path, relative_path)
+        if os.path.exists(candidate):
+            return candidate
+    except AttributeError:
+        pass
+
+    return os.path.join(script_dir, relative_path)
 
 i = -1
 value_1 = -1
