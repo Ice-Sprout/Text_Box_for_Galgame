@@ -1,3 +1,4 @@
+#text_to_image.py
 import os
 import random
 from PIL import Image, ImageDraw, ImageFont
@@ -13,7 +14,7 @@ resource_dir = os.path.join(exe_dir, 'resource') if exe_dir else os.path.join(os
 if os.path.isdir(resource_dir) and resource_dir not in sys.path:
     sys.path.insert(0, resource_dir)
 
-from info import background_configs, characters, text_configs_dict, DEFAULT_BACKGROUND
+import json
 from api import get_emotion_from_text, get_emotion_name, DEFAULT_EMOTION
 from text_fit_draw import draw_text_auto
 from image_fit_paste import paste_image_auto
@@ -55,6 +56,62 @@ def get_resource_path(relative_path):
     # 最后回退到脚本目录下的路径（即：项目源码布局）
     return os.path.join(script_dir, relative_path)
 
+
+# --- Load configuration from resource/info.json (preferred) or fall back to info.py ---
+def _find_info_json():
+    # Candidates: exe_dir/resource/info.json, script_dir/resource/info.json, sys._MEIPASS/resource/info.json
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else None
+    candidates = []
+    if exe_dir:
+        candidates.append(os.path.join(exe_dir, 'resource', 'info.json'))
+    candidates.append(os.path.join(script_dir, 'resource', 'info.json'))
+    # try PyInstaller temp bundle
+    try:
+        meipass = sys._MEIPASS
+        candidates.append(os.path.join(meipass, 'resource', 'info.json'))
+    except Exception:
+        pass
+    for p in candidates:
+        if p and os.path.exists(p):
+            return p
+    return None
+
+
+# 修改 _load_info_config 函数返回五个值
+def _load_info_config():
+    info_json = _find_info_json()
+    if info_json:
+        try:
+            with open(info_json, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            bg = data.get('background_configs', {})
+            DEFAULT_BG = data.get('DEFAULT_BACKGROUND') or data.get('DEFAULT_BACKGROUND', None)
+            chars = data.get('characters', {})
+            texts = data.get('text_configs_dict', {})
+            font_configs = data.get('font_configs', {})  # 新增
+
+            # Convert list positions to tuples for backward compatibility
+            for k, v in list(bg.items()):
+                if isinstance(v.get('text_box_topleft'), list):
+                    v['text_box_topleft'] = tuple(v['text_box_topleft'])
+                if isinstance(v.get('text_box_bottomright'), list):
+                    v['text_box_bottomright'] = tuple(v['text_box_bottomright'])
+
+            for role, cfgs in (texts or {}).items():
+                for cfg in cfgs:
+                    if 'position' in cfg and isinstance(cfg['position'], list):
+                        cfg['position'] = tuple(cfg['position'])
+                    # Normalize font_color to tuple for PIL compatibility
+                    if 'font_color' in cfg and isinstance(cfg['font_color'], list):
+                        cfg['font_color'] = tuple(cfg['font_color'])
+
+            return bg, chars, texts, DEFAULT_BG, font_configs  # 修改返回值
+        except Exception as e:
+            print(f"加载 resource/info.json 失败: {e}")
+
+# 修改加载语句
+background_configs, characters, text_configs_dict, DEFAULT_BACKGROUND, font_configs = _load_info_config()
 
 def get_clipboard_image():
     """从剪贴板获取图片，返回PIL.Image对象（无图片则返回None）"""
@@ -134,7 +191,7 @@ def check_pregen_images_exist(character_name, background_name=DEFAULT_BACKGROUND
             return False
     return True
 
-def pre_generate_character_images(character_name, background_name=DEFAULT_BACKGROUND    ):
+def pre_generate_character_images(character_name, background_name=DEFAULT_BACKGROUND):
     """预生成角色所有表情和背景组合的图片"""
     if check_pregen_images_exist(character_name, background_name):
         print(f"{character_name} 在背景 {background_name} 下的预生成图片已存在，跳过生成")
@@ -152,6 +209,11 @@ def pre_generate_character_images(character_name, background_name=DEFAULT_BACKGR
 
     # 获取角色专属文字配置
     text_configs = text_configs_dict.get(character_name, [])
+    
+    # 获取角色的 enlarge 参数，默认为 1.0
+    enlarge = character_config.get("enlarge", 1.0)
+    # 计算目标宽度：基础750像素乘以enlarge参数
+    target_char_width = int(750 * enlarge)
     
     for i in range(num_bg):
         # 加载背景图片
@@ -216,16 +278,40 @@ def pre_generate_character_images(character_name, background_name=DEFAULT_BACKGR
         for j in range(emotion_count):
             overlay_path = os.path.join(character_folder, f"{character_name}{j+1}.png")
             overlay = Image.open(overlay_path).convert("RGBA")
+            
+            # ====== 修改：根据 enlarge 参数缩放角色表情图片 ======
+            overlay_width, overlay_height = overlay.size
+            
+            # 如果当前宽度不是目标宽度，则进行缩放
+            if overlay_width != target_char_width:
+                # 计算缩放比例
+                scale_factor = target_char_width / overlay_width
+                new_char_height = int(overlay_height * scale_factor)
+                # 使用LANCZOS算法高质量缩放
+                overlay = overlay.resize((target_char_width, new_char_height), Image.LANCZOS)
+            
             result = background.copy()
 
-            # 绘制角色图片
-            result.paste(overlay, (0+characters[character_name]["drawx"], 134+characters[character_name]["drawy"]), overlay)
+            # 绘制角色图片 - 使用原有的drawx/drawy值
+            result.paste(overlay, (0+character_config["drawx"], 134+character_config["drawy"]), overlay)
 
             # === 在预生成阶段绘制角色专属文字 ===
             if text_configs:
                 draw = ImageDraw.Draw(result)
                 shadow_offset = (2, 2)
                 shadow_color = (0, 0, 0)
+                
+                # 确定角色名字字体
+                name_font = "font3.ttf"  # 默认
+                
+                if font_configs and "characters" in font_configs and character_name in font_configs["characters"]:
+                    # 从字体配置中获取角色名字字体
+                    name_font = font_configs["characters"][character_name].get("name_font", "font3.ttf")
+                else:
+                    # 回退到角色配置中的字体
+                    character_config = characters.get(character_name)
+                    if character_config:
+                        name_font = character_config.get("font", "font3.ttf")
                 
                 for config in text_configs:
                     char_text = config["text"]
@@ -234,7 +320,7 @@ def pre_generate_character_images(character_name, background_name=DEFAULT_BACKGR
                     font_size = config["font_size"]
                 
                     # 使用 get_resource_path 获取字体文件路径
-                    font_path_char = get_resource_path("font3.ttf")
+                    font_path_char = get_resource_path(name_font)
                     try:
                         char_font = ImageFont.truetype(font_path_char, font_size)
                         shadow_position = (position[0] + shadow_offset[0], position[1] + shadow_offset[1])
@@ -258,8 +344,9 @@ def get_pregen_image_path(character_name, img_num, background_name=DEFAULT_BACKG
     pregen_folder = get_pregen_folder()
     return os.path.join(pregen_folder, f"{character_name}_{background_name}_{img_num}.jpg")
 
+# 修改generate_image函数的参数
 def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
-                  emotion_id=None, expression=None, latex_insert=False, reduce=True):
+                  emotion_id=None, expression=None, latex_insert=False, compression_ratio=100):
     """
     根据文本/图片、角色和背景信息生成图片
     新增：支持剪贴板图片输入，绕开LaTeX转换
@@ -276,17 +363,47 @@ def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
         raise ValueError(f"角色 '{character_name}' 或背景 '{background_name}' 配置不存在")
 
     # === 3. 情绪和表情判定 ===
-    if emotion_id is None:
-        # 图片输入时使用默认情绪
-        emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text) if text else DEFAULT_EMOTION)
-    emotion_name = get_emotion_name(emotion_id)
     num_bg = background_config["num_bg"]
     emotion_count = character_config["emotion_count"]
-    if expression:
-        img_num = random.randint((expression-1)*num_bg+1, expression*num_bg)
+    
+    # 如果指定了表情编号（包括随机生成的），优先使用指定表情，跳过情绪分析API
+    if expression is not None:
+        # 确保expression在有效范围内
+        if isinstance(expression, (int, str)):
+            try:
+                expression_num = int(expression)
+                expression_num = max(1, min(expression_num, emotion_count))
+                img_num = random.randint((expression_num-1)*num_bg+1, expression_num*num_bg)
+                
+                # 使用指定的表情编号作为情绪ID（为了emotion_name）
+                emotion_id = expression_num
+                emotion_name = get_emotion_name(emotion_id)
+                print(f"使用指定表情: {expression_num} (1-{emotion_count})，跳过情绪分析API")
+            except (ValueError, TypeError):
+                # 如果转换失败，回退到情绪判断
+                if emotion_id is None:
+                    emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text) if text else DEFAULT_EMOTION)
+                emotion_name = get_emotion_name(emotion_id)
+                emotion_id = max(1, min(emotion_id, emotion_count))
+                img_num = random.randint((emotion_id-1)*num_bg+1, emotion_id*num_bg)
+        else:
+            # 如果expression不是int或str，回退到情绪判断
+            if emotion_id is None:
+                emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text) if text else DEFAULT_EMOTION)
+            emotion_name = get_emotion_name(emotion_id)
+            emotion_id = max(1, min(emotion_id, emotion_count))
+            img_num = random.randint((emotion_id-1)*num_bg+1, emotion_id*num_bg)
     else:
+        # 没有指定表情，使用情绪分析API
+        if emotion_id is None:
+            # 图片输入时使用默认情绪
+            emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text) if text else DEFAULT_EMOTION)
+        emotion_name = get_emotion_name(emotion_id)
         emotion_id = max(1, min(emotion_id, emotion_count))
         img_num = random.randint((emotion_id-1)*num_bg+1, emotion_id*num_bg)
+    
+    # 注意：expression为None时表示"自动"，会使用情绪分析API
+    # expression为整数时，表示指定的表情编号，跳过情绪分析API
 
     # === 4. 加载基础图片 ===
     base_image_path = get_pregen_image_path(character_name, img_num, background_name)  
@@ -295,7 +412,6 @@ def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
     text_box_bottomright = background_config["text_box_bottomright"]
     font_path = get_resource_path(character_config["font"])
     png_bytes = None
-
 
     # === 5. 分逻辑处理：图片输入 / 文本输入 ===
     if is_image_input and content_image is not None:
@@ -316,6 +432,8 @@ def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
                 image_overlay=None,
                 max_image_size=(background_config.get("max_image_width"), background_config.get("max_image_height")),
                 role_name=character_name,
+                text_configs_dict=text_configs_dict,  # 传递文字配置
+                font_configs=font_configs,  # 新增：传递字体配置
             )
         except Exception as e:
             print(f"图片绘制失败: {e}")
@@ -333,6 +451,15 @@ def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
                     text = convert_latex_in_text(text)
                 except ImportError:
                     print("警告: LaTeX功能不可用")
+            
+            # 确定角色的对话框字体
+            character_config = characters.get(character_name)
+            dialog_font = None
+            if character_config:
+                dialog_font = character_config.get("dialog_font", character_config.get("font", "font3.ttf"))
+            
+            dialog_font_path = get_resource_path(dialog_font) if dialog_font else None
+            
             # 调用文字绘制函数
             png_bytes = draw_text_auto(
                 image_source=base_image,
@@ -344,8 +471,10 @@ def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
                 valign='top',
                 color=(255, 255, 255),
                 max_font_height=145,
-                font_path=font_path,
+                font_path=dialog_font_path,  # 使用角色的对话框字体
                 role_name=character_name,
+                text_configs_dict=text_configs_dict,  # 传递文字配置
+                font_configs=font_configs,  # 新增：传递字体配置
             )
         else:
             # 无文本无图片，返回基础图片
@@ -354,9 +483,13 @@ def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
                 png_bytes = output.getvalue()
 
     # === 6. 图片压缩 ===
-    if reduce and png_bytes:
+    if compression_ratio < 100 and png_bytes:  # 只有压缩比例小于100时才压缩
         try:
-            png_bytes = compress_image_simple(png_bytes, quality=75)
+            # 将压缩比例(10-100)映射到质量参数(10-100)
+            # 压缩比例100% -> 质量100 (不压缩)
+            # 压缩比例10% -> 质量10 (最大压缩)
+            quality = compression_ratio
+            png_bytes = compress_image_simple(png_bytes, quality=quality)
         except Exception as e:
             print(f"图片压缩失败: {e}")
 
@@ -369,7 +502,8 @@ def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
         "expression_num": 1 + ((img_num - 1) // num_bg),
         "background_num": (img_num - 1) % num_bg + 1,
         "image_num": img_num,
-        "compressed": reduce,
+        "compressed": compression_ratio < 100,  # 压缩比例小于100表示已压缩
+        "compression_ratio": compression_ratio,  # 添加压缩比例信息
         "input_type": "image" if is_image_input else "text"  
     }
     return png_bytes, info_dict

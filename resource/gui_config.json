@@ -1,11 +1,10 @@
 {
   "global_hotkey": "alt+shift+a",
-  "current_character": "karuha",
+  "current_character": "neri",
   "current_background": "hoshishiro",
   "expression": null,
   "latex_enabled": false,
   "delay": 0.1,
-  "reduce_image": true,
   "auto_paste": true,
   "auto_send": true,
   "block_hotkey": true,
@@ -21,5 +20,6 @@
     "WeChatApp.exe",
     "QQ.exe"
   ],
-  "enable_whitelist": true
+  "enable_whitelist": true,
+  "compression_ratio": 67
 }

@@ -76,11 +76,16 @@ def compress_image_simple(image_bytes, quality=75):
     
     参数:
     - image_bytes: 原始图片字节流
-    - quality: 压缩质量(0-100)
+    - quality: 压缩质量(0-100)，100表示不压缩
     
     返回:
     - compressed_bytes: 压缩后的图片字节流
     """
+    # 如果质量为100，直接返回原图（不压缩）
+    if quality >= 100:
+        print(f"不压缩: 质量为{quality}%")
+        return image_bytes
+    
     # 打开图片并转换为RGB（去除透明通道）
     image = Image.open(io.BytesIO(image_bytes))
     if image.mode in ('RGBA', 'LA'):
@@ -101,6 +106,12 @@ def compress_image_simple(image_bytes, quality=75):
     original_size_kb = len(image_bytes) / 1024
     compressed_size_kb = len(output.getvalue()) / 1024
     
-    print(f"简单压缩: {original_size_kb:.1f}KB -> {compressed_size_kb:.1f}KB (质量={quality})")
+    # 计算压缩率
+    if original_size_kb > 0:
+        compression_rate = (compressed_size_kb / original_size_kb) * 100
+    else:
+        compression_rate = 0
+    
+    print(f"压缩: {original_size_kb:.1f}KB -> {compressed_size_kb:.1f}KB (质量={quality}, 压缩率={compression_rate:.1f}%)")
     
     return output.getvalue()

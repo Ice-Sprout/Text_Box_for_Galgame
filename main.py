@@ -59,7 +59,57 @@ resource_dir = os.path.join(exe_dir, 'resource') if exe_dir else os.path.join(os
 if os.path.isdir(resource_dir) and resource_dir not in sys.path:
     sys.path.insert(0, resource_dir)
 
-from info import background_configs, characters, text_configs_dict, DEFAULT_BACKGROUND
+
+# Load info from resource/info.json first, fallback to info.py, final fallback to defaults
+def _find_info_json_path():
+    candidates = []
+    if resource_dir:
+        candidates.append(os.path.join(resource_dir, 'info.json'))
+    candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource', 'info.json'))
+    try:
+        meipass = sys._MEIPASS
+        candidates.append(os.path.join(meipass, 'resource', 'info.json'))
+    except Exception:
+        pass
+    for p in candidates:
+        if p and os.path.exists(p):
+            return p
+    return None
+
+
+def _load_info():
+    j = _find_info_json_path()
+    if j:
+        try:
+            import json as _json
+            with open(j, 'r', encoding='utf-8') as jf:
+                data = _json.load(jf)
+            bg = data.get('background_configs', {})
+            default_bg = data.get('DEFAULT_BACKGROUND') or data.get('DEFAULT_BACKGROUND', None)
+            chars = data.get('characters', {})
+            texts = data.get('text_configs_dict', {})
+            # normalize arrays -> tuples where code expects tuples
+            for k, v in list(bg.items()):
+                if isinstance(v.get('text_box_topleft'), list):
+                    v['text_box_topleft'] = tuple(v['text_box_topleft'])
+                if isinstance(v.get('text_box_bottomright'), list):
+                    v['text_box_bottomright'] = tuple(v['text_box_bottomright'])
+            for role, cfgs in (texts or {}).items():
+                for cfg in cfgs:
+                    if 'position' in cfg and isinstance(cfg['position'], list):
+                        cfg['position'] = tuple(cfg['position'])
+                    if 'font_color' in cfg and isinstance(cfg['font_color'], list):
+                        cfg['font_color'] = tuple(cfg['font_color'])
+            return bg, chars, texts, default_bg
+        except Exception as e:
+            print(f"加载 resource/info.json 失败: {e}")
+
+
+    return {"默认背景": {"num_bg": 1, "text_box_topleft": (0,0), "text_box_bottomright": (100,100)}}, {"默认角色": {"emotion_count":1, "font":"font3.ttf", "drawx":0, "drawy":0}}, {}, "默认背景"
+
+
+background_configs, characters, text_configs_dict, DEFAULT_BACKGROUND = _load_info()
+
 from text_to_image import generate_image, pre_generate_character_images, get_pregen_folder, check_pregen_images_exist, delate
 
 

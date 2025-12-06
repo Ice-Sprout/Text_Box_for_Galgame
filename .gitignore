@@ -1,9 +1,6 @@
-# 敏感API密钥文件 (真实文件)
 api.txt
-
-# Copilot生成的说明文件
+info.json
 .github/copilot-instructions.md
-
 .DS_Store
 .vscode/
 *.log

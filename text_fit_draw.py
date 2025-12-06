@@ -1,3 +1,4 @@
+#text_fit_draw.py
 from io import BytesIO
 from typing import Tuple, Union, Literal
 from PIL import Image, ImageDraw, ImageFont
@@ -34,6 +35,7 @@ def get_resource_path(relative_path):
         pass
 
     return os.path.join(script_dir, relative_path)
+
 
 try:
     from pilmoji import Pilmoji
@@ -130,6 +132,7 @@ def get_char_font(char: str, chinese_font: ImageFont.FreeTypeFont, math_font: Im
         # 对于英文字母、数字和半角符号，使用数学字体
         return math_font
 
+# 在函数签名中添加 font_configs 参数
 def draw_text_auto(
     image_source: Union[str, Image.Image],
     top_left: Tuple[int, int],
@@ -145,6 +148,7 @@ def draw_text_auto(
     image_overlay: Union[str, Image.Image,None]=None,
     role_name: str = "unknown",  # 添加角色名称参数
     text_configs_dict: dict = None,  # 添加文字配置字典参数
+    font_configs: dict = None,  # 新增：字体配置字典
 ) -> bytes:
     """
     在指定矩形内自适应字号绘制文本；
@@ -210,19 +214,52 @@ def draw_text_auto(
 
     # --- 2. 字体加载 ---
     def _load_fonts(size: int) -> tuple[ImageFont.FreeTypeFont, ImageFont.FreeTypeFont]:
-        """加载中文字体和数学字体"""
+        """加载中文字体和数学字体，使用全局配置"""
+        # 确定中文字体路径
+        chinese_font_path = None
+        
+        if font_configs and "global" in font_configs:
+            # 使用全局中文字体配置
+            global_font = font_configs["global"].get("chinese_font", "font3.ttf")
+            chinese_font_path = get_resource_path(global_font)
+        else:
+            # 回退到原有逻辑
+            if font_path and os.path.exists(font_path):
+                chinese_font_path = font_path
+            else:
+                try:
+                    chinese_font_path = "DejaVuSans.ttf"
+                except Exception:
+                    chinese_font_path = None
+        
         # 加载中文字体
-        if font_path and os.path.exists(font_path):
-            chinese_font = ImageFont.truetype(font_path, size=size)
+        if chinese_font_path and os.path.exists(chinese_font_path):
+            try:
+                chinese_font = ImageFont.truetype(chinese_font_path, size=size)
+            except Exception:
+                try:
+                    chinese_font = ImageFont.truetype("DejaVuSans.ttf", size=size)
+                except Exception:
+                    chinese_font = ImageFont.load_default()
         else:
             try:
                 chinese_font = ImageFont.truetype("DejaVuSans.ttf", size=size)
             except Exception:
                 chinese_font = ImageFont.load_default()
         
-        # 加载数学字体 (Cambria)
-        math_font_path = get_resource_path("cambria.ttc")
-        if os.path.exists(math_font_path):
+        # 确定英文/数学字体路径
+        math_font_path = None
+        
+        if font_configs and "global" in font_configs:
+            # 使用全局英文/数学字体配置
+            math_font_name = font_configs["global"].get("english_math_font", "cambria.ttc")
+            math_font_path = get_resource_path(math_font_name)
+        else:
+            # 回退到原有逻辑
+            math_font_path = get_resource_path("cambria.ttc")
+        
+        # 加载数学字体
+        if math_font_path and os.path.exists(math_font_path):
             try:
                 math_font = ImageFont.truetype(math_font_path, size=size)
             except Exception:

@@ -1,4 +1,4 @@
-# filename: image_fit_paste.py
+# image_fit_paste.py
 from io import BytesIO
 from typing import Tuple, Literal, Union
 from PIL import Image, ImageDraw, ImageFont
@@ -48,6 +48,7 @@ def paste_image_auto(
     max_image_size: Tuple[int, int] = (None, None),  # 添加最大图片尺寸限制 (width, height)
     role_name: str = "unknown",  # 添加角色名称参数
     text_configs_dict: dict = None,  # 添加文字配置字典参数
+    font_configs: dict = None,  # 新增：字体配置字典
 ) -> bytes:
     """
     在指定矩形内放置一张图片（content_image），按比例缩放至“最大但不超过”该矩形。
@@ -152,18 +153,40 @@ def paste_image_auto(
             font_color = config["font_color"]
             font_size = config["font_size"]
         
-            # 使用 get_resource_path 获取字体文件路径
-            font_path = get_resource_path("font3.ttf")
-            font = ImageFont.truetype(font_path, font_size)
+            # 确定角色名字字体
+            name_font_path = None
             
-            # 计算阴影位置
-            shadow_position = (position[0] + shadow_offset[0], position[1] + shadow_offset[1])
+            if font_configs and "characters" in font_configs and role_name in font_configs["characters"]:
+                # 使用角色特定的名字字体配置
+                name_font_name = font_configs["characters"][role_name].get("name_font", "font3.ttf")
+                name_font_path = get_resource_path(name_font_name)
+            else:
+                # 回退到默认字体
+                name_font_path = get_resource_path("font3.ttf")
             
-            # 先绘制阴影文字
-            draw.text(shadow_position, text, fill=shadow_color, font=font)
-            
-            # 再绘制主文字（覆盖在阴影上方）
-            draw.text(position, text, fill=font_color, font=font)
+            # 加载字体
+            try:
+                font = ImageFont.truetype(name_font_path, font_size)
+                
+                # 计算阴影位置
+                shadow_position = (position[0] + shadow_offset[0], position[1] + shadow_offset[1])
+                
+                # 先绘制阴影文字
+                draw.text(shadow_position, text, fill=shadow_color, font=font)
+                
+                # 再绘制主文字（覆盖在阴影上方）
+                draw.text(position, text, fill=font_color, font=font)
+            except Exception as e:
+                print(f"角色名字字体加载失败: {e}, 使用默认字体")
+                # 尝试使用默认字体
+                try:
+                    default_font_path = get_resource_path("font3.ttf")
+                    font = ImageFont.truetype(default_font_path, font_size)
+                    shadow_position = (position[0] + shadow_offset[0], position[1] + shadow_offset[1])
+                    draw.text(shadow_position, text, fill=shadow_color, font=font)
+                    draw.text(position, text, fill=font_color, font=font)
+                except Exception as e2:
+                    print(f"默认字体也加载失败: {e2}")
 
     # 输出 PNG bytes
     buf = BytesIO()
