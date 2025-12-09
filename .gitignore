@@ -10,3 +10,8 @@ __pycache__/
 dist/
 build/
 env/
+build.ps1
+logo.ico
+HoshishiroDialog.spec
+ResourceManager.spec
+release/

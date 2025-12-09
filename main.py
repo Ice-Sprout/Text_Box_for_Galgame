@@ -105,7 +105,7 @@ def _load_info():
             print(f"加载 resource/info.json 失败: {e}")
 
 
-    return {"默认背景": {"num_bg": 1, "text_box_topleft": (0,0), "text_box_bottomright": (100,100)}}, {"默认角色": {"emotion_count":1, "font":"font3.ttf", "drawx":0, "drawy":0}}, {}, "默认背景"
+    return {"默认背景": {"num_bg": 1, "text_box_topleft": (0,0), "text_box_bottomright": (100,100)}}, {"默认角色": {"emotion_count":1, "font":"font3.", "drawx":0, "drawy":0}}, {}, "默认背景"
 
 
 background_configs, characters, text_configs_dict, DEFAULT_BACKGROUND = _load_info()
@@ -178,9 +178,6 @@ def get_current_character():
     character_names = list(characters.keys())
     return character_names[current_character_index-1] if current_character_index-1 < len(character_names) else character_names[0]
 
-def get_current_font():
-    current_char = get_current_character()
-    return get_resource_path(characters[current_char]["font"])
 
 def get_current_emotion_count():
     current_char = get_current_character()
@@ -454,7 +451,7 @@ def Start():
             emotion_id=None,  # 自动分析情绪
             expression=expression,  # 使用全局expression变量
             latex_insert=latex_insert,  # 使用全局latex_insert变量
-            reduce=reduce_image  # 使用全局reduce_image变量
+            compression_ratio=60  # 固定压缩比例 60
         )
 
         # 打印生成信息

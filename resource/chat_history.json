@@ -1,72 +1,72 @@
 [
   {
-    "text": "测试一下",
-    "emotion_id": 4,
-    "emotion_name": "气恼",
+    "text": "我生气了！",
+    "emotion_id": 15,
+    "emotion_name": "愤怒",
     "role": null,
-    "timestamp": 1765022291.1459045
-  },
-  {
-    "text": "测试一下",
-    "emotion_id": 4,
-    "emotion_name": "气恼",
-    "role": null,
-    "timestamp": 1765022291.1459045
-  },
-  {
-    "text": "随机也慢吗",
-    "emotion_id": 4,
-    "emotion_name": "气恼",
-    "role": null,
-    "timestamp": 1765022291.1459045
-  },
-  {
-    "text": "哭哭",
-    "emotion_id": 14,
-    "emotion_name": "哭泣",
-    "role": null,
-    "timestamp": 1765022291.1459045
-  },
-  {
-    "text": "生气了！",
-    "emotion_id": 4,
-    "emotion_name": "气恼",
-    "role": null,
-    "timestamp": 1765022291.1459045
-  },
-  {
-    "text": "好高兴",
-    "emotion_id": 2,
-    "emotion_name": "开心",
-    "role": null,
-    "timestamp": 1765022291.1459045
-  },
-  {
-    "text": "测试一下",
-    "emotion_id": 4,
-    "emotion_name": "气恼",
-    "role": null,
-    "timestamp": 1765022291.1459045
+    "timestamp": 1765251650.253503
   },
   {
     "text": "我生气了！",
+    "emotion_id": 15,
+    "emotion_name": "愤怒",
+    "role": null,
+    "timestamp": 1765251650.253503
+  },
+  {
+    "text": "我生气了！",
+    "emotion_id": 15,
+    "emotion_name": "愤怒",
+    "role": null,
+    "timestamp": 1765251650.253503
+  },
+  {
+    "text": "我生气了！",
+    "emotion_id": 6,
+    "emotion_name": "伤心",
+    "role": null,
+    "timestamp": 1765251650.253503
+  },
+  {
+    "text": "我生气了！",
+    "emotion_id": 6,
+    "emotion_name": "伤心",
+    "role": "karuha",
+    "timestamp": 1765251650.253503
+  },
+  {
+    "text": "我生气了！",
+    "emotion_id": 9,
+    "emotion_name": "卖萌",
+    "role": "jibie",
+    "timestamp": 1765251650.253503
+  },
+  {
+    "text": "挺好玩的这个",
     "emotion_id": 4,
     "emotion_name": "气恼",
-    "role": null,
-    "timestamp": 1765022291.1459045
+    "role": "jibie",
+    "timestamp": 1765251650.253503
   },
   {
-    "text": "呜呜呜",
-    "emotion_id": 14,
-    "emotion_name": "哭泣",
-    "role": null,
-    "timestamp": 1765022291.1459045
+    "text": "测试一下abc",
+    "emotion_id": 1,
+    "emotion_name": "平静",
+    "role": "mashiro",
+    "timestamp": 1765251650.253503
   },
   {
-    "text": "开心呢",
-    "emotion_id": 2,
-    "emotion_name": "开心",
-    "role": null,
-    "timestamp": 1765022291.1459045
+    "text": "ceshi",
+    "emotion_id": 1,
+    "emotion_name": "平静",
+    "role": "karuha",
+    "timestamp": 1765251650.253503
+  },
+  {
+    "text": "cesi",
+    "emotion_id": 1,
+    "emotion_name": "平静",
+    "role": "karuha",
+    "timestamp": 1765251650.253503
   }
 ]

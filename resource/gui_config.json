@@ -1,9 +1,9 @@
 {
   "global_hotkey": "alt+shift+a",
-  "current_character": "neri",
+  "current_character": "karuha",
   "current_background": "hoshishiro",
-  "expression": null,
-  "latex_enabled": false,
+  "expression": 2,
+  "latex_enabled": true,
   "delay": 0.1,
   "auto_paste": true,
   "auto_send": true,
@@ -21,5 +21,5 @@
     "QQ.exe"
   ],
   "enable_whitelist": true,
-  "compression_ratio": 67
+  "compression_ratio": 48
 }

@@ -177,6 +177,10 @@ class EmotionAnalyzer:
         # 初始化时加载持久化的历史对话
         self.load_history_from_file()
 
+        # 调试：记录最近一次的提示词与原始回复
+        self.last_prompt: str = ""
+        self.last_response: str = ""
+
     def __del__(self):
         """析构函数，关闭会话池"""
         if hasattr(self, 'session'):
@@ -209,7 +213,11 @@ class EmotionAnalyzer:
             
             # 构建带历史上下文的Prompt
             prompt = self._build_emotion_prompt(text, role)
+            # 调试记录
+            self.last_prompt = prompt
             response = self._call_deepseek_api(prompt)
+            # 调试记录
+            self.last_response = response
             emotion_id = self._parse_emotion_response(response, role)
             
             # 新增：将当前文本和情绪加入历史对话
@@ -235,7 +243,8 @@ class EmotionAnalyzer:
             for idx, (history_text, history_emotion, history_role) in enumerate(self.chat_history[:-1]):  # 排除当前文本（还未分析）
                 # 获取情绪名称（如果有角色特定的映射）
                 emotion_name = self._get_emotion_name_by_id(history_emotion, history_role)
-                history_str += f"{idx + 1}. 文本：{history_text} → 情绪：{emotion_name}（图片{history_emotion}）\n"
+                # 为避免模型受历史图片编号影响，历史记录中不包含具体图片编号
+                history_str += f"{idx + 1}. 文本：{history_text} → 情绪：{emotion_name}\n"
             history_str += "\n"
 
         # 根据角色获取情绪映射
@@ -653,6 +662,15 @@ def get_chat_history() -> List[Tuple[str, int, Optional[str]]]:
 def reload_api_config() -> None:
     """重新加载API配置和情绪映射"""
     emotion_analyzer.reload_config()
+
+
+# 新增对外接口：获取最近一次的提示词与回复（用于调试）
+def get_last_prompt() -> str:
+    return getattr(emotion_analyzer, 'last_prompt', "")
+
+
+def get_last_response() -> str:
+    return getattr(emotion_analyzer, 'last_response', "")
 
 
 # 测试函数

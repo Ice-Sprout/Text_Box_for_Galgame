@@ -301,17 +301,14 @@ def pre_generate_character_images(character_name, background_name=DEFAULT_BACKGR
                 shadow_offset = (2, 2)
                 shadow_color = (0, 0, 0)
                 
-                # 确定角色名字字体
-                name_font = "font3.ttf"  # 默认
-                
+                # 确定角色名字字体：优先角色专属，其次全局中文，最后回退默认
+                name_font = None
                 if font_configs and "characters" in font_configs and character_name in font_configs["characters"]:
-                    # 从字体配置中获取角色名字字体
-                    name_font = font_configs["characters"][character_name].get("name_font", "font3.ttf")
-                else:
-                    # 回退到角色配置中的字体
-                    character_config = characters.get(character_name)
-                    if character_config:
-                        name_font = character_config.get("font", "font3.ttf")
+                    name_font = font_configs["characters"][character_name].get("name_font", "") or ""
+                if (not name_font) and font_configs and "global" in font_configs:
+                    name_font = font_configs["global"].get("chinese_font", "") or ""
+                if not name_font:
+                    name_font = "font3.ttf"
                 
                 for config in text_configs:
                     char_text = config["text"]
@@ -319,10 +316,18 @@ def pre_generate_character_images(character_name, background_name=DEFAULT_BACKGR
                     font_color = config["font_color"]
                     font_size = config["font_size"]
                 
-                    # 使用 get_resource_path 获取字体文件路径
-                    font_path_char = get_resource_path(name_font)
+                    # 使用 get_resource_path 获取字体文件路径（优先 resource/fonts/<name>）
+                    font_cfg_path = name_font if os.path.sep in name_font else os.path.join("fonts", name_font)
+                    font_path_char = get_resource_path(font_cfg_path)
+                    # 若解析到的是目录或不存在，则尝试回退到 DejaVuSans.ttf
+                    if (not os.path.exists(font_path_char)) or os.path.isdir(font_path_char):
+                        fallback_path = get_resource_path(os.path.join("fonts", "DejaVuSans.ttf"))
+                        font_path_char = fallback_path if os.path.exists(fallback_path) else None
                     try:
-                        char_font = ImageFont.truetype(font_path_char, font_size)
+                        if font_path_char:
+                            char_font = ImageFont.truetype(font_path_char, font_size)
+                        else:
+                            raise OSError("font path not resolved")
                         shadow_position = (position[0] + shadow_offset[0], position[1] + shadow_offset[1])
                         
                         # 绘制阴影文字
@@ -377,28 +382,28 @@ def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
                 
                 # 使用指定的表情编号作为情绪ID（为了emotion_name）
                 emotion_id = expression_num
-                emotion_name = get_emotion_name(emotion_id)
+                emotion_name = get_emotion_name(emotion_id, character_name)
                 print(f"使用指定表情: {expression_num} (1-{emotion_count})，跳过情绪分析API")
             except (ValueError, TypeError):
                 # 如果转换失败，回退到情绪判断
                 if emotion_id is None:
-                    emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text) if text else DEFAULT_EMOTION)
-                emotion_name = get_emotion_name(emotion_id)
+                    emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text, character_name) if text else DEFAULT_EMOTION)
+                emotion_name = get_emotion_name(emotion_id, character_name)
                 emotion_id = max(1, min(emotion_id, emotion_count))
                 img_num = random.randint((emotion_id-1)*num_bg+1, emotion_id*num_bg)
         else:
             # 如果expression不是int或str，回退到情绪判断
             if emotion_id is None:
-                emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text) if text else DEFAULT_EMOTION)
-            emotion_name = get_emotion_name(emotion_id)
+                emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text, character_name) if text else DEFAULT_EMOTION)
+            emotion_name = get_emotion_name(emotion_id, character_name)
             emotion_id = max(1, min(emotion_id, emotion_count))
             img_num = random.randint((emotion_id-1)*num_bg+1, emotion_id*num_bg)
     else:
         # 没有指定表情，使用情绪分析API
         if emotion_id is None:
             # 图片输入时使用默认情绪
-            emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text) if text else DEFAULT_EMOTION)
-        emotion_name = get_emotion_name(emotion_id)
+            emotion_id = DEFAULT_EMOTION if is_image_input else (get_emotion_from_text(text, character_name) if text else DEFAULT_EMOTION)
+        emotion_name = get_emotion_name(emotion_id, character_name)
         emotion_id = max(1, min(emotion_id, emotion_count))
         img_num = random.randint((emotion_id-1)*num_bg+1, emotion_id*num_bg)
     
@@ -452,13 +457,19 @@ def generate_image(text, character_name, background_name=DEFAULT_BACKGROUND,
                 except ImportError:
                     print("警告: LaTeX功能不可用")
             
-            # 确定角色的对话框字体
+            # 对话框字体选择：角色设置为空则使用全局中文字体
             character_config = characters.get(character_name)
-            dialog_font = None
+            dialog_font = ""
             if character_config:
-                dialog_font = character_config.get("dialog_font", character_config.get("font", "font3.ttf"))
-            
-            dialog_font_path = get_resource_path(dialog_font) if dialog_font else None
+                dialog_font = character_config.get("dialog_font", "") or ""
+            if (not dialog_font) and font_configs and "global" in font_configs:
+                dialog_font = font_configs["global"].get("chinese_font", "")
+            # 解析路径（resource/fonts/<name>）
+            if dialog_font:
+                dialog_cfg_path = dialog_font if os.path.sep in dialog_font else os.path.join("fonts", dialog_font)
+                dialog_font_path = get_resource_path(dialog_cfg_path)
+            else:
+                dialog_font_path = None
             
             # 调用文字绘制函数
             png_bytes = draw_text_auto(

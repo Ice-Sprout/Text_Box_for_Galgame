@@ -157,16 +157,26 @@ def paste_image_auto(
             name_font_path = None
             
             if font_configs and "characters" in font_configs and role_name in font_configs["characters"]:
-                # 使用角色特定的名字字体配置
-                name_font_name = font_configs["characters"][role_name].get("name_font", "font3.ttf")
-                name_font_path = get_resource_path(name_font_name)
+                # 角色名字字体：为空则使用全局中文字体
+                name_font_name = font_configs["characters"][role_name].get("name_font", "") or ""
+                if (not name_font_name) and "global" in font_configs:
+                    name_font_name = font_configs["global"].get("chinese_font", "")
+                if name_font_name:
+                    cfg_path = name_font_name if os.path.sep in name_font_name else os.path.join("fonts", name_font_name)
+                    name_font_path = get_resource_path(cfg_path)
+                else:
+                    name_font_path = None
             else:
-                # 回退到默认字体
-                name_font_path = get_resource_path("font3.ttf")
+                # 无角色配置时，尝试全局中文字体
+                name_font_name = None
+                if font_configs and "global" in font_configs:
+                    name_font_name = font_configs["global"].get("chinese_font", "")
+                name_font_path = get_resource_path(os.path.join("fonts", name_font_name)) if name_font_name else None
             
             # 加载字体
             try:
-                font = ImageFont.truetype(name_font_path, font_size)
+                # 若未能解析到路径，则回退到默认字体加载（可能失败）
+                font = ImageFont.truetype(name_font_path, font_size) if name_font_path else ImageFont.truetype(get_resource_path(os.path.join("fonts","font3.ttf")), font_size)
                 
                 # 计算阴影位置
                 shadow_position = (position[0] + shadow_offset[0], position[1] + shadow_offset[1])

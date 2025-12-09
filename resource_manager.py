@@ -2,19 +2,48 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser
 import os
+import sys
 import shutil
 from PIL import Image
 import json
 
+# 统一资源路径解析：优先 exe 同目录的 resource/，回退脚本目录，再次回退 _MEIPASS
+def get_resource_base_dir():
+    exe_dir = None
+    try:
+        if getattr(sys, 'frozen', False):
+            exe_dir = os.path.dirname(sys.executable)
+    except Exception:
+        exe_dir = None
+
+    if exe_dir:
+        resource_dir = os.path.join(exe_dir, 'resource')
+        if os.path.isdir(resource_dir):
+            return resource_dir
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    resource_dir_script = os.path.join(script_dir, 'resource')
+    if os.path.isdir(resource_dir_script):
+        return resource_dir_script
+
+    meipass = getattr(sys, '_MEIPASS', None)
+    if meipass:
+        resource_dir_meipass = os.path.join(meipass, 'resource')
+        if os.path.isdir(resource_dir_meipass):
+            return resource_dir_meipass
+
+    # 默认回退到脚本目录下的 resource（若不存在，后续会创建）
+    return resource_dir_script
+
 class ResourceManager:
     def __init__(self, root):
         self.root = root
-        self.root.title("资源管理器 - 图片生成器")
+        self.root.title("资源管理器")
         self.root.geometry("900x700")
         
-        # 基础路径 - 指向 resource 文件夹
+        # 基础路径 - 指向 resource 文件夹（打包优先 exe 同目录）
+        self.resource_dir = get_resource_base_dir()
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.resource_dir = os.path.join(self.base_dir, "resource")
         
         # 背景和角色目录
         self.background_dir = os.path.join(self.resource_dir, "background")
@@ -32,7 +61,8 @@ class ResourceManager:
         self.english_math_font_var = tk.StringVar(value="cambria.ttc")  # 全局英文/数学字体
         
         # 角色字体变量（在角色选择时动态设置）
-        self.character_dialog_font_var = tk.StringVar(value="font3.ttf")
+        self.character_dialog_font_var = tk.StringVar(value="")
+        self.character_name_font_var = tk.StringVar(value="")
         
         # 创建必要的目录
         os.makedirs(self.resource_dir, exist_ok=True)
@@ -254,10 +284,18 @@ class ResourceManager:
         
         ttk.Button(dialog_font_frame, text="选择字体", 
                   command=self.select_character_dialog_font).grid(row=0, column=1, padx=5)
+        # 名字字体控件
+        ttk.Label(self.settings_frame, text="名字字体:").grid(row=3, column=2, sticky=tk.W, pady=5)
+        name_font_frame = ttk.Frame(self.settings_frame)
+        name_font_frame.grid(row=3, column=3, sticky=(tk.W, tk.E), pady=5)
+        self.char_name_font_entry = ttk.Entry(name_font_frame, textvariable=self.character_name_font_var, width=20, state="normal")
+        self.char_name_font_entry.grid(row=0, column=0, padx=(0, 5), sticky=(tk.W, tk.E))
+        ttk.Button(name_font_frame, text="选择字体", command=self.select_character_name_font).grid(row=0, column=1, padx=5)
         
         # 添加保存字体设置的按钮到角色设置部分
+        # 将保存按钮放低一行，避免遮挡名字字体的输入框
         ttk.Button(self.settings_frame, text="保存字体设置", 
-                  command=self.save_character_font_setting).grid(row=4, column=0, columnspan=4, pady=10)
+              command=self.save_character_font_setting).grid(row=5, column=0, columnspan=4, pady=10)
         
         # 角色图片预览
         ttk.Label(parent, text="角色表情预览:").grid(row=5, column=0, sticky=tk.W, pady=5)
@@ -304,7 +342,7 @@ class ResourceManager:
         info_text = """1. 中文字体：用于显示中文和全角符号
 2. 英文/数学字体：用于显示英文、数字和数学符号
 3. 支持字体格式：.ttf, .ttc, .otf, .woff, .woff2
-4. 字体文件将自动复制到 resource/fonts/ 目录"""
+4. 优先使用角色设置中的中文字体，角色设置中为空时使用此处的中文字体"""
         
         ttk.Label(global_frame, text=info_text, justify=tk.LEFT, wraplength=500).grid(
             row=3, column=0, columnspan=2, sticky=tk.W, pady=5, padx=5)
@@ -332,7 +370,9 @@ class ResourceManager:
         ttk.Button(font_button_frame, text="删除选中字体", 
                   command=self.delete_selected_font).grid(row=0, column=1, padx=5)
         ttk.Button(font_button_frame, text="打开字体文件夹", 
-                  command=self.open_fonts_folder).grid(row=0, column=2, padx=5)
+              command=self.open_fonts_folder).grid(row=0, column=2, padx=5)
+        ttk.Button(font_button_frame, text="导入字体文件", 
+              command=self.import_font_file).grid(row=0, column=3, padx=5)
         
         # 初始化字体列表
         self.refresh_font_list()
@@ -375,9 +415,10 @@ class ResourceManager:
         self.load_api_config()
     
     def select_font_file(self, font_var, font_type):
-        """选择字体文件"""
+        """选择字体文件（仅从 resource/fonts 选择，不导入）"""
         file_path = filedialog.askopenfilename(
             title=f"选择{font_type}文件",
+            initialdir=self.fonts_dir,
             filetypes=[
                 ("字体文件", "*.ttf *.ttc *.otf *.woff *.woff2"),
                 ("TrueType字体", "*.ttf"),
@@ -387,33 +428,41 @@ class ResourceManager:
                 ("所有文件", "*.*")
             ]
         )
-        
         if not file_path:
             return
-        
         try:
-            # 验证字体文件
+            # 只允许选择 resource/fonts 下的文件
+            if not os.path.commonpath([self.fonts_dir, file_path]).startswith(self.fonts_dir):
+                messagebox.showerror("错误", "请选择 resource/fonts 目录中的字体文件。\n如需导入新字体，请使用“导入字体文件”按钮。")
+                return
+            filename = os.path.basename(file_path)
+            font_var.set(filename)
+        except Exception as e:
+            messagebox.showerror("错误", f"选择字体失败: {e}")
+
+    def import_font_file(self):
+        """导入字体文件到 resource/fonts（与选择分离）"""
+        file_path = filedialog.askopenfilename(
+            title="导入字体文件",
+            filetypes=[
+                ("字体文件", "*.ttf *.ttc *.otf *.woff *.woff2"),
+                ("所有文件", "*.*")
+            ]
+        )
+        if not file_path:
+            return
+        try:
             if not self.validate_font_file(file_path):
                 messagebox.showerror("错误", "选择的文件不是有效的字体文件，或文件已损坏。")
                 return
-            
-            # 复制字体文件到resource/fonts目录
             filename = os.path.basename(file_path)
             dest_path = os.path.join(self.fonts_dir, filename)
-            
-            # 如果目标文件已存在，询问是否覆盖
             if os.path.exists(dest_path):
                 if not messagebox.askyesno("确认", f"字体文件 '{filename}' 已存在，是否覆盖？"):
                     return
-            
             shutil.copy2(file_path, dest_path)
-            
-            # 更新字体变量显示
-            font_var.set(filename)
-            
-            messagebox.showinfo("成功", f"{font_type}文件已导入: {filename}")
+            messagebox.showinfo("成功", f"字体文件已导入: {filename}")
             self.refresh_font_list()
-            
         except Exception as e:
             messagebox.showerror("错误", f"导入字体文件失败: {e}")
     
@@ -486,7 +535,7 @@ class ResourceManager:
                     with open(config_path, 'r', encoding='utf-8') as f:
                         config_data = json.load(f)
                     
-                    if config_data.get("dialog_font") == font_filename:
+                    if config_data.get("dialog_font") == font_filename or config_data.get("name_font") == font_filename:
                         return True
                 except Exception:
                     continue
@@ -522,13 +571,14 @@ class ResourceManager:
             print(f"选中字体: {font_filename} ({size_str})")
     
     def select_character_dialog_font(self):
-        """选择角色对话框字体"""
+        """选择角色对话框字体（仅从 resource/fonts 选择，不导入）"""
         if not self.current_character:
             messagebox.showerror("错误", "请先选择一个角色")
             return
         
         file_path = filedialog.askopenfilename(
             title=f"为 {self.current_character} 选择对话框字体",
+            initialdir=self.fonts_dir,
             filetypes=[
                 ("字体文件", "*.ttf *.ttc *.otf *.woff *.woff2"),
                 ("所有文件", "*.*")
@@ -539,29 +589,41 @@ class ResourceManager:
             return
         
         try:
-            # 验证字体文件
-            if not self.validate_font_file(file_path):
-                messagebox.showerror("错误", "选择的文件不是有效的字体文件")
+            # 仅允许选择 resource/fonts 下的文件
+            if not os.path.commonpath([self.fonts_dir, file_path]).startswith(self.fonts_dir):
+                messagebox.showerror("错误", "请选择 resource/fonts 目录中的字体文件。\n如需导入新字体，请在字体管理页使用“导入字体文件”。")
                 return
-            
-            # 复制字体文件到resource/fonts目录
             filename = os.path.basename(file_path)
-            dest_path = os.path.join(self.fonts_dir, filename)
-            
-            if os.path.exists(dest_path):
-                if not messagebox.askyesno("确认", f"字体文件 '{filename}' 已存在，是否覆盖？"):
-                    return
-            
-            shutil.copy2(file_path, dest_path)
-            
-            # 更新角色对话框字体变量
             self.character_dialog_font_var.set(filename)
-            
             messagebox.showinfo("成功", f"已为 {self.current_character} 设置对话框字体: {filename}")
-            self.refresh_font_list()
             
         except Exception as e:
             messagebox.showerror("错误", f"设置角色对话框字体失败: {e}")
+
+    def select_character_name_font(self):
+        """选择角色名字字体（仅从 resource/fonts 选择，不导入）"""
+        if not self.current_character:
+            messagebox.showerror("错误", "请先选择一个角色")
+            return
+        file_path = filedialog.askopenfilename(
+            title=f"为 {self.current_character} 选择名字字体",
+            initialdir=self.fonts_dir,
+            filetypes=[
+                ("字体文件", "*.ttf *.ttc *.otf *.woff *.woff2"),
+                ("所有文件", "*.*")
+            ]
+        )
+        if not file_path:
+            return
+        try:
+            if not os.path.commonpath([self.fonts_dir, file_path]).startswith(self.fonts_dir):
+                messagebox.showerror("错误", "请选择 resource/fonts 目录中的字体文件。\n如需导入新字体，请在字体管理页使用“导入字体文件”。")
+                return
+            filename = os.path.basename(file_path)
+            self.character_name_font_var.set(filename)
+            messagebox.showinfo("成功", f"已为 {self.current_character} 设置名字字体: {filename}")
+        except Exception as e:
+            messagebox.showerror("错误", f"设置角色名字字体失败: {e}")
     
     def save_character_font_setting(self):
         """保存角色字体设置"""
@@ -585,13 +647,15 @@ class ResourceManager:
                     "drawx": -450,
                     "drawy": -100,
                     "enlarge": 1.0,
-                    "font": "font3.ttf",
-                    "dialog_font": "font3.ttf",  # 新增字段
+                    "font": "",
+                    "dialog_font": "",  # 默认空
+                    "name_font": "",    # 默认空
                     "color": {"r": 255, "g": 255, "b": 255}
                 }
             
-            # 更新对话框字体
+            # 更新对话框字体与名字字体
             config_data["dialog_font"] = self.character_dialog_font_var.get()
+            config_data["name_font"] = self.character_name_font_var.get()
             
             # 保存配置
             with open(config_path, 'w', encoding='utf-8') as f:
@@ -620,8 +684,8 @@ class ResourceManager:
                 # 加载全局字体
                 if "global" in font_configs:
                     global_fonts = font_configs["global"]
-                    self.chinese_font_var.set(global_fonts.get("chinese_font", "font3.ttf"))
-                    self.english_math_font_var.set(global_fonts.get("english_math_font", "cambria.ttc"))
+                    self.chinese_font_var.set(global_fonts.get("chinese_font", ""))
+                    self.english_math_font_var.set(global_fonts.get("english_math_font", ""))
                 
                 # 角色字体配置会在选择角色时加载
                 
@@ -783,8 +847,8 @@ class ResourceManager:
                 "drawx": drawx,
                 "drawy": drawy,
                 "enlarge": enlarge,  # 新增 enlarge 参数
-                "font": "font3.ttf",
-                "dialog_font": "font3.ttf",  # 新增对话框字体
+                    "font": "",
+                    "dialog_font": "",  # 新增对话框字体
                 "color": {"r": 255, "g": 255, "b": 255}  # 默认白色
             }
             
@@ -1191,7 +1255,7 @@ class ResourceManager:
         
         # 对话框字体设置（新增）
         ttk.Label(edit_dialog, text="对话框字体:").grid(row=4, column=0, sticky=tk.W, pady=10, padx=10)
-        dialog_font_var = tk.StringVar(value=config_data.get("dialog_font", "font3.ttf"))
+        dialog_font_var = tk.StringVar(value=config_data.get("dialog_font", ""))
         
         dialog_font_frame = ttk.Frame(edit_dialog)
         dialog_font_frame.grid(row=4, column=1, sticky=(tk.W, tk.E), pady=10, padx=10)
@@ -1200,22 +1264,46 @@ class ResourceManager:
         dialog_font_entry.grid(row=0, column=0, padx=(0, 5))
         
         def select_dialog_font():
-            # 这里可以复用select_font_file逻辑，简化实现
             file_path = filedialog.askopenfilename(
                 title="选择对话框字体",
+                initialdir=self.fonts_dir,
                 filetypes=[("字体文件", "*.ttf *.ttc *.otf *.woff *.woff2")]
             )
             if file_path:
-                filename = os.path.basename(file_path)
-                # 简单复制到字体目录
-                dest_path = os.path.join(self.fonts_dir, filename)
                 try:
-                    shutil.copy2(file_path, dest_path)
+                    if not os.path.commonpath([self.fonts_dir, file_path]).startswith(self.fonts_dir):
+                        messagebox.showerror("错误", "请选择 resource/fonts 目录中的字体文件。\n如需导入新字体，请在字体管理页使用“导入字体文件”。")
+                        return
+                    filename = os.path.basename(file_path)
                     dialog_font_var.set(filename)
                 except Exception as e:
-                    messagebox.showerror("错误", f"复制字体文件失败: {e}")
+                    messagebox.showerror("错误", f"选择字体失败: {e}")
         
         ttk.Button(dialog_font_frame, text="选择", command=select_dialog_font).grid(row=0, column=1)
+
+        # 名字字体设置
+        ttk.Label(edit_dialog, text="名字字体:").grid(row=5, column=0, sticky=tk.W, pady=10, padx=10)
+        name_font_var = tk.StringVar(value=config_data.get("name_font", ""))
+        name_font_frame = ttk.Frame(edit_dialog)
+        name_font_frame.grid(row=5, column=1, sticky=(tk.W, tk.E), pady=10, padx=10)
+        name_font_entry = ttk.Entry(name_font_frame, textvariable=name_font_var, width=15)
+        name_font_entry.grid(row=0, column=0, padx=(0, 5))
+        def select_name_font():
+            file_path = filedialog.askopenfilename(
+                title="选择名字字体",
+                initialdir=self.fonts_dir,
+                filetypes=[("字体文件", "*.ttf *.ttc *.otf *.woff *.woff2")]
+            )
+            if file_path:
+                try:
+                    if not os.path.commonpath([self.fonts_dir, file_path]).startswith(self.fonts_dir):
+                        messagebox.showerror("错误", "请选择 resource/fonts 目录中的字体文件。\n如需导入新字体，请在字体管理页使用“导入字体文件”。")
+                        return
+                    filename = os.path.basename(file_path)
+                    name_font_var.set(filename)
+                except Exception as e:
+                    messagebox.showerror("错误", f"选择字体失败: {e}")
+        ttk.Button(name_font_frame, text="选择", command=select_name_font).grid(row=0, column=1)
         
         def save_settings():
             try:
@@ -1224,7 +1312,8 @@ class ResourceManager:
                 config_data["drawx"] = int(drawx_var.get())
                 config_data["drawy"] = int(drawy_var.get())
                 config_data["enlarge"] = float(enlarge_var.get())
-                config_data["dialog_font"] = dialog_font_var.get()  # 新增
+                config_data["dialog_font"] = dialog_font_var.get()
+                config_data["name_font"] = name_font_var.get()
                 
                 # 保存配置
                 with open(config_path, 'w', encoding='utf-8') as f:
@@ -1246,7 +1335,7 @@ class ResourceManager:
                 messagebox.showerror("错误", f"输入值错误: {e}")
         
         # 保存按钮位置调整
-        ttk.Button(edit_dialog, text="保存设置", command=save_settings).grid(row=5, column=0, columnspan=2, pady=20)
+        ttk.Button(edit_dialog, text="保存设置", command=save_settings).grid(row=6, column=0, columnspan=2, pady=20)
     
     def edit_emotion_mapping(self):
         """编辑角色的情绪映射"""
@@ -1601,9 +1690,11 @@ class ResourceManager:
                 enlarge = config_data.get("enlarge", 1.0)
                 color = config_data.get("color", {"r": 255, "g": 255, "b": 255})
                 
-                # 加载角色对话框字体
-                dialog_font = config_data.get("dialog_font", "font3.ttf")
+                # 加载角色对话框/名字字体
+                dialog_font = config_data.get("dialog_font", "")
+                name_font = config_data.get("name_font", "")
                 self.character_dialog_font_var.set(dialog_font)
+                self.character_name_font_var.set(name_font)
                 
                 # 新增：加载情绪映射
                 emotion_mapping = config_data.get("emotion_mapping", {})
@@ -1630,7 +1721,8 @@ class ResourceManager:
                 self.char_drawx_label.config(text="0")
                 self.char_drawy_label.config(text="0")
                 self.char_enlarge_label.config(text="1.0")
-                self.character_dialog_font_var.set("font3.ttf")
+                self.character_dialog_font_var.set("")
+                self.character_name_font_var.set("")
                 self.current_emotion_mapping = {}
     
     def generate_config_preview(self):
@@ -1724,8 +1816,8 @@ class ResourceManager:
                         drawy = config_data.get("drawy", -100)
                         enlarge = config_data.get("enlarge", 1.0)
                         color = config_data.get("color", {"r": 255, "g": 255, "b": 255})
-                        font = config_data.get("font", "font3.ttf")
-                        dialog_font = config_data.get("dialog_font", "font3.ttf")
+                        font = config_data.get("font", "")
+                        dialog_font = config_data.get("dialog_font", "")
                         
                         # 新增：获取情绪映射
                         emotion_mapping = config_data.get("emotion_mapping", {})
@@ -1748,8 +1840,8 @@ class ResourceManager:
                         drawy = -100
                         enlarge = 1.0
                         color = {"r": 255, "g": 255, "b": 255}
-                        font = "font3.ttf"
-                        dialog_font = "font3.ttf"
+                        font = ""
+                        dialog_font = ""
                         emotion_mapping = {}  # 默认空映射
                     
                     # 角色配置 - 包含情绪映射
@@ -1809,11 +1901,12 @@ class ResourceManager:
                         with open(config_path, 'r', encoding='utf-8') as f:
                             config_data = json.load(f)
                         
-                        # 获取角色对话框字体
-                        dialog_font = config_data.get("dialog_font", "font3.ttf")
+                        # 获取角色对话框/名字字体
+                        dialog_font = config_data.get("dialog_font", "")
+                        name_font = config_data.get("name_font", "")
                         font_configs["characters"][char_folder_name] = {
                             "dialog_font": dialog_font,
-                            "name_font": config_data.get("font", "font3.ttf")  # 角色名字字体
+                            "name_font": name_font  # 角色名字字体
                         }
         
         # API配置

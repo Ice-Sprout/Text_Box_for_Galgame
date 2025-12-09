@@ -324,17 +324,17 @@ class ImageGeneratorGUI:
         """更新压缩比例标签"""
         ratio = int(value)
         if ratio == 100:
-            label_text = "100% (不压缩)"
+            label_text = "100 (不压缩)"
         elif ratio >= 80:
-            label_text = f"{ratio}% (轻微压缩)"
+            label_text = f"{ratio} (轻微压缩)"
         elif ratio >= 60:
-            label_text = f"{ratio}% (中等压缩)"
+            label_text = f"{ratio} (中等压缩)"
         elif ratio >= 40:
-            label_text = f"{ratio}% (较强压缩)"
+            label_text = f"{ratio} (较强压缩)"
         elif ratio >= 20:
-            label_text = f"{ratio}% (强力压缩)"
+            label_text = f"{ratio} (强力压缩)"
         else:
-            label_text = f"{ratio}% (最大压缩)"
+            label_text = f"{ratio} (最大压缩)"
         
         self.compression_label_var.set(label_text)
 
@@ -447,11 +447,11 @@ class ImageGeneratorGUI:
             x=left_start_x + 170, y=left_start_y + 5 * row_height - 3)
         
         # 压缩比例滑块
-        self.create_text_with_outline("压缩比例：", 
+        self.create_text_with_outline("压缩质量：", 
                                       left_start_x, left_start_y + 6 * row_height)
 
         # 创建压缩比例标签
-        self.compression_label_var = tk.StringVar(value="100% (不压缩)")
+        self.compression_label_var = tk.StringVar(value="100 (不压缩)")
         self.compression_label = tk.Label(self.canvas, textvariable=self.compression_label_var,
                                          font=("微软雅黑", 9), bg="#D1D0D2", fg="black",
                                          relief=tk.FLAT)

@@ -173,7 +173,17 @@ def draw_text_auto(
                 position = config["position"]
                 font_color = config["font_color"]
                 font_size = config["font_size"]
-                font_path_char = get_resource_path("font3.ttf")
+                # 角色名字字体：优先角色配置，其次全局中文字体，最后回退到默认
+                name_font = None
+                if font_configs and "characters" in font_configs and role_name in font_configs["characters"]:
+                    name_font = font_configs["characters"][role_name].get("name_font", "") or ""
+                if (not name_font) and font_configs and "global" in font_configs:
+                    name_font = font_configs["global"].get("chinese_font", "")
+                if name_font:
+                    cfg_path = name_font if os.path.sep in name_font else os.path.join("fonts", name_font)
+                    font_path_char = get_resource_path(cfg_path)
+                else:
+                    font_path_char = get_resource_path(os.path.join("fonts", "font3.ttf"))
                 try:
                     char_font = ImageFont.truetype(font_path_char, font_size)
                     regular_draw.text((position[0]+shadow_offset[0], position[1]+shadow_offset[1]), char_text, fill=shadow_color, font=char_font)
@@ -218,19 +228,18 @@ def draw_text_auto(
         # 确定中文字体路径
         chinese_font_path = None
         
-        if font_configs and "global" in font_configs:
-            # 使用全局中文字体配置
-            global_font = font_configs["global"].get("chinese_font", "font3.ttf")
-            chinese_font_path = get_resource_path(global_font)
-        else:
-            # 回退到原有逻辑
-            if font_path and os.path.exists(font_path):
-                chinese_font_path = font_path
+        # 优先使用传入的角色对话字体；否则使用全局中文字体；最后回退
+        if font_path and os.path.exists(font_path):
+            chinese_font_path = font_path
+        elif font_configs and "global" in font_configs:
+            global_font_name = font_configs["global"].get("chinese_font", "")
+            if global_font_name:
+                cfg_path = global_font_name if os.path.sep in global_font_name else os.path.join("fonts", global_font_name)
+                chinese_font_path = get_resource_path(cfg_path)
             else:
-                try:
-                    chinese_font_path = "DejaVuSans.ttf"
-                except Exception:
-                    chinese_font_path = None
+                chinese_font_path = None
+        else:
+            chinese_font_path = None
         
         # 加载中文字体
         if chinese_font_path and os.path.exists(chinese_font_path):
@@ -253,10 +262,11 @@ def draw_text_auto(
         if font_configs and "global" in font_configs:
             # 使用全局英文/数学字体配置
             math_font_name = font_configs["global"].get("english_math_font", "cambria.ttc")
-            math_font_path = get_resource_path(math_font_name)
+            cfg_math = math_font_name if os.path.sep in math_font_name else os.path.join("fonts", math_font_name)
+            math_font_path = get_resource_path(cfg_math)
         else:
             # 回退到原有逻辑
-            math_font_path = get_resource_path("cambria.ttc")
+            math_font_path = get_resource_path(os.path.join("fonts", "cambria.ttc"))
         
         # 加载数学字体
         if math_font_path and os.path.exists(math_font_path):
